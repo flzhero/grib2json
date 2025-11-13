@@ -130,9 +130,9 @@ final class GribRecordWriter extends AbstractRecordWriter {
 
     private void writeLonLatBounds() {
         writeIfSet("lo1", gds.getLo1());  // longitude of first grid point
-        writeIfSet("la1", gds.getLa1());  // latitude of first grid point
+        writeIfSet("la1", gds.getLa2());  // latitude of first grid point (swapped with la2)
         writeIfSet("lo2", gds.getLo2());  // longitude of last grid point
-        writeIfSet("la2", gds.getLa2());  // latitude of last grid point
+        writeIfSet("la2", gds.getLa1());  // latitude of last grid point (swapped with la1)
         writeIfSet("dx", gds.getDx());    // i direction increment
         writeIfSet("dy", gds.getDy());    // j direction increment
     }
@@ -262,14 +262,25 @@ final class GribRecordWriter extends AbstractRecordWriter {
 
     /**
      * Write the record's data as a Json array: "data": [ ... ]
+     * Data is flipped vertically (row by row) to correct scan mode.
      */
     void writeData(Grib2Data gd) throws IOException {
         float[] data = gd.getData(record.getGdsOffset(), record.getPdsOffset(), ids.getRefTime());
         if (data != null) {
+            int nx = gds.getNx();  // number of points per row
+            int ny = gds.getNy();  // number of rows
+            
             jg.writeStartArray("data");
-            for (float value : data) {
-                jg.write(new FloatValue(value));
+            
+            // Flip data vertically: write rows in reverse order
+            for (int row = ny - 1; row >= 0; row--) {
+                int startIdx = row * nx;
+                int endIdx = startIdx + nx;
+                for (int i = startIdx; i < endIdx && i < data.length; i++) {
+                    jg.write(new FloatValue(data[i]));
+                }
             }
+            
             jg.writeEnd();
         }
     }
